@@ -3,6 +3,7 @@ name: "Terraform"
 on:
   push:
     branches:
+      - main
       - "major/**"
       - "minor/**"
       - "patch/**"
@@ -30,9 +31,17 @@ permissions:
   contents: read
   id-token: write
 
+# Serialise runs so a merge-triggered apply never races another apply or a
+# feature-branch plan for the same state.
+concurrency:
+  group: terraform-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
+  # Pushes to main (merged PRs) apply to prd automatically; other pushes
+  # plan; workflow_dispatch overrides both.
   Terraform:
-    name: "Terraform ${{ inputs.terraform_action || 'plan' }} (${{ inputs.env || 'prd' }})"
+    name: "Terraform ${{ inputs.terraform_action || (github.ref == 'refs/heads/main' && 'apply' || 'plan') }} (${{ inputs.env || 'prd' }})"
     runs-on: ubuntu-latest
     environment: ${{ inputs.env || 'prd' }}
     env:
@@ -40,6 +49,7 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_USE_OIDC: "true"
+      TF_ACTION: ${{ inputs.terraform_action || (github.ref == 'refs/heads/main' && 'apply' || 'plan') }}
       TF_ENV: ${{ inputs.env || 'prd' }}
     steps:
       - name: "Checkout"
@@ -85,21 +95,21 @@ jobs:
           container_name: ${{ github.event.repository.name }}
 
       - name: "Terraform Plan"
-        if: inputs.terraform_action == 'plan' || inputs.terraform_action == ''
+        if: env.TF_ACTION == 'plan'
         run: |
           terraform -chdir=infra plan \
             -var-file="vars/globals.tfvars" \
             -var-file="vars/${TF_ENV}.tfvars"
 
       - name: "Terraform Apply"
-        if: inputs.terraform_action == 'apply'
+        if: env.TF_ACTION == 'apply'
         run: |
           terraform -chdir=infra apply -auto-approve \
             -var-file="vars/globals.tfvars" \
             -var-file="vars/${TF_ENV}.tfvars"
 
       - name: "Terraform Destroy"
-        if: inputs.terraform_action == 'destroy'
+        if: env.TF_ACTION == 'destroy'
         run: |
           terraform -chdir=infra destroy -auto-approve \
             -var-file="vars/globals.tfvars" \
