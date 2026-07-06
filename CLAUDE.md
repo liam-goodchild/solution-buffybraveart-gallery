@@ -56,12 +56,13 @@ All Azure resources follow: `{type}-{project}-{env}-{region}-{instance}`
 
 **Infrastructure** (`infra/`): Terraform (azurerm ~> 4.0). Custom domain: `buffybraveart.com`. Yoco secret key is passed as a Terraform variable named `yoco_secret_key`.
 
-**CI/CD** (`.github/workflows/`): GitHub Actions with OIDC authentication.
+**CI/CD** (`.github/workflows/`): GitHub Actions with OIDC authentication. Pipelines consume the shared reusable workflows and composite actions from `skyhaven-ltd/pipeline-engineering-github-actions`, SHA-pinned to a released tag.
 
 - `swa.yml` — deploys frontend + API to SWA. Auto-triggers on `frontend/**` or `functions/**` pushes to feature branches; manual trigger selects `dev`/`prd` environment.
-- `terraform.yml` — runs Terraform plan/apply/destroy. Auto-triggers on `infra/**` pushes to feature branches (always targets `prd`). Manual trigger selects action.
-- `linting.yml` — Super-Linter on PRs to `main` (zizmor, Checkov, TFLint, Stylelint). Config in `.github/linters/`.
-- `tag.yml` — creates a semver tag on PR merge. Branch prefix determines bump: `major/`, `minor/`, `patch/`.
+- `terraform.yml` — runs Terraform plan/apply/destroy. Auto-triggers on `infra/**` pushes to feature branches (always targets `prd`). Manual trigger selects environment and action. State plumbing and Key Vault secret fetching are delegated to the shared composite actions.
+- `lint.yml` — shared `reusable-lint.yml` (MegaLinter, `cupcake` flavour) on PRs to `main`. Config in `.github/validation/.mega-linter.yml`.
+- `pr-validation.yml` — shared `reusable-terraform.yml` on PRs to `main`: Terraform hygiene, zizmor, then real `dev`+`prd` plans with Checkov plan-aware scanning. Plan-time secrets come from the platform Key Vault via `tf_var_secrets`.
+- `tag.yml` — shared `reusable-tag.yml` creates a semver tag on PR merge. Branch prefix determines bump: `major/`, `minor/`, `patch/`.
 
 **Branch naming**: Use `major/`, `minor/`, or `patch/` prefixes. This is required — it controls which CI workflows trigger and what version tag is created on merge.
 
