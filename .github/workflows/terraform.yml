@@ -31,8 +31,7 @@ permissions:
   id-token: write
 
 jobs:
-  # Plan, apply, or destroy Terraform infrastructure
-  terraform:
+  Terraform:
     name: "Terraform ${{ inputs.terraform_action || 'plan' }} (${{ inputs.env || 'prd' }})"
     runs-on: ubuntu-latest
     environment: ${{ inputs.env || 'prd' }}
@@ -40,24 +39,32 @@ jobs:
       ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-      ARM_USE_OIDC: true
+      ARM_USE_OIDC: "true"
+      TF_ENV: ${{ inputs.env || 'prd' }}
     steps:
       - name: "Checkout"
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: "Setup Terraform"
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.3"
+
+      - name: "Azure Login"
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
 
       - name: "Ensure State Container"
-        uses: ./.github/actions/ensure-tfstate-container
+        uses: skyhaven-ltd/pipeline-engineering-github-actions/actions/ensure-tfstate-container@6cfa143b42ff464e4101d69c09945db9fac369e5 # v2.0.0
         with:
           storage_account_name: stplatform${{ inputs.env || 'prd' }}uks02
           container_name: ${{ github.event.repository.name }}
-          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
-          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
-          azure_subscription_id: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
+          login: "false"
 
       - name: "Fetch Secrets From Key Vault"
         uses: skyhaven-ltd/pipeline-engineering-github-actions/actions/keyvault-secrets@6cfa143b42ff464e4101d69c09945db9fac369e5 # v2.0.0
@@ -70,51 +77,38 @@ jobs:
           login: "false"
 
       - name: "Terraform Init"
-        env:
-          TF_ENV: ${{ inputs.env || 'prd' }}
-          REPO_NAME: ${{ github.event.repository.name }}
-          PLATFORM_SUBSCRIPTION_ID: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
-        run: |
-          terraform -chdir=infra init \
-            -backend-config="resource_group_name=rg-platform-$TF_ENV-uks-01" \
-            -backend-config="storage_account_name=stplatform${TF_ENV}uks02" \
-            -backend-config="container_name=$REPO_NAME" \
-            -backend-config="key=terraform.tfstate" \
-            -backend-config="subscription_id=$PLATFORM_SUBSCRIPTION_ID"
+        uses: skyhaven-ltd/pipeline-engineering-github-actions/actions/terraform-backend-init@6cfa143b42ff464e4101d69c09945db9fac369e5 # v2.0.0
+        with:
+          environment: ${{ inputs.env || 'prd' }}
+          working_directory: infra
+          platform_subscription_id: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
+          container_name: ${{ github.event.repository.name }}
 
       - name: "Terraform Plan"
         if: inputs.terraform_action == 'plan' || inputs.terraform_action == ''
-        env:
-          TF_ENV: ${{ inputs.env || 'prd' }}
         run: |
           terraform -chdir=infra plan \
             -var-file="vars/globals.tfvars" \
-            -var-file="vars/$TF_ENV.tfvars"
+            -var-file="vars/${TF_ENV}.tfvars"
 
       - name: "Terraform Apply"
         if: inputs.terraform_action == 'apply'
-        env:
-          TF_ENV: ${{ inputs.env || 'prd' }}
         run: |
           terraform -chdir=infra apply -auto-approve \
             -var-file="vars/globals.tfvars" \
-            -var-file="vars/$TF_ENV.tfvars"
+            -var-file="vars/${TF_ENV}.tfvars"
 
       - name: "Terraform Destroy"
         if: inputs.terraform_action == 'destroy'
-        env:
-          TF_ENV: ${{ inputs.env || 'prd' }}
         run: |
           terraform -chdir=infra destroy -auto-approve \
             -var-file="vars/globals.tfvars" \
-            -var-file="vars/$TF_ENV.tfvars"
+            -var-file="vars/${TF_ENV}.tfvars"
 
       - name: "Break State Lease"
         if: always()
-        uses: ./.github/actions/break-tfstate-lease
+        uses: skyhaven-ltd/pipeline-engineering-github-actions/actions/break-tfstate-lease@6cfa143b42ff464e4101d69c09945db9fac369e5 # v2.0.0
         with:
           storage_account_name: stplatform${{ inputs.env || 'prd' }}uks02
           container_name: ${{ github.event.repository.name }}
-          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
-          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
-          azure_subscription_id: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
+          login: "false"
