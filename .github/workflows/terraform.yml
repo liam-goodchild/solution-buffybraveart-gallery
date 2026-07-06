@@ -73,13 +73,14 @@ jobs:
         env:
           TF_ENV: ${{ inputs.env || 'prd' }}
           REPO_NAME: ${{ github.event.repository.name }}
+          PLATFORM_SUBSCRIPTION_ID: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
         run: |
           terraform -chdir=infra init \
             -backend-config="resource_group_name=rg-platform-$TF_ENV-uks-01" \
             -backend-config="storage_account_name=stplatform${TF_ENV}uks02" \
             -backend-config="container_name=$REPO_NAME" \
             -backend-config="key=terraform.tfstate" \
-            -backend-config="subscription_id=${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}"
+            -backend-config="subscription_id=$PLATFORM_SUBSCRIPTION_ID"
 
       - name: "Terraform Plan"
         if: inputs.terraform_action == 'plan' || inputs.terraform_action == ''
