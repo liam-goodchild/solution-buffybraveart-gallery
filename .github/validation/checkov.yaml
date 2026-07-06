@@ -12,3 +12,4 @@ skip-check:
   - CKV_AZURE_189 # Key Vault disables public network access
   - CKV_AZURE_109 # Key Vault allows firewall rules settings
   - CKV2_AZURE_32 # Private endpoint configured for Key Vault
+  - CKV_SECRET_17 # Yoco secret key is deliberately set as an SWA app setting; value lives in Key Vault
