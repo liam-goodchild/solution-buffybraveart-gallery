@@ -37,13 +37,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.env || 'prd' }}
     env:
-      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       ARM_USE_OIDC: true
-      TF_VAR_yoco_secret_key: ${{ secrets.YOCO_SECRET_KEY }}
-      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
@@ -56,11 +53,21 @@ jobs:
       - name: "Ensure State Container"
         uses: ./.github/actions/ensure-tfstate-container
         with:
-          storage_account_name: sttfsplatform${{ inputs.env || 'prd' }}uks01
+          storage_account_name: stplatform${{ inputs.env || 'prd' }}uks02
           container_name: ${{ github.event.repository.name }}
-          azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-          azure_subscription_id: ${{ secrets.AZURE_PLATFORM_SUBSCRIPTION_ID }}
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          azure_subscription_id: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
+
+      - name: "Fetch Secrets From Key Vault"
+        uses: skyhaven-ltd/pipeline-engineering-github-actions/actions/keyvault-secrets@6cfa143b42ff464e4101d69c09945db9fac369e5 # v2.0.0
+        with:
+          keyvault_name: kv-platform-${{ inputs.env || 'prd' }}-uks-02
+          secrets: |
+            TF_VAR_yoco_secret_key=braveart-yoco-secret-key
+            TF_VAR_cloudflare_api_token=cloudflare-api-token
+            TF_VAR_cloudflare_account_id=cloudflare-account-id
+          login: "false"
 
       - name: "Terraform Init"
         env:
@@ -68,11 +75,11 @@ jobs:
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
           terraform -chdir=infra init \
-            -backend-config="resource_group_name=rg-tfs-platform-$TF_ENV-uks-01" \
-            -backend-config="storage_account_name=sttfsplatform${TF_ENV}uks01" \
+            -backend-config="resource_group_name=rg-platform-$TF_ENV-uks-01" \
+            -backend-config="storage_account_name=stplatform${TF_ENV}uks02" \
             -backend-config="container_name=$REPO_NAME" \
             -backend-config="key=terraform.tfstate" \
-            -backend-config="subscription_id=${{ secrets.AZURE_PLATFORM_SUBSCRIPTION_ID }}"
+            -backend-config="subscription_id=${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}"
 
       - name: "Terraform Plan"
         if: inputs.terraform_action == 'plan' || inputs.terraform_action == ''
@@ -105,8 +112,8 @@ jobs:
         if: always()
         uses: ./.github/actions/break-tfstate-lease
         with:
-          storage_account_name: sttfsplatform${{ inputs.env || 'prd' }}uks01
+          storage_account_name: stplatform${{ inputs.env || 'prd' }}uks02
           container_name: ${{ github.event.repository.name }}
-          azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
-          azure_subscription_id: ${{ secrets.AZURE_PLATFORM_SUBSCRIPTION_ID }}
+          azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+          azure_subscription_id: ${{ vars.AZURE_PLATFORM_SUBSCRIPTION_ID }}
