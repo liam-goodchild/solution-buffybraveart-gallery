@@ -20,6 +20,6 @@ jobs:
       environments: '["dev","prd"]'
       terraform_version: "1.15.3"
       tf_var_secrets: |
-        TF_VAR_yoco_secret_key=braveart-yoco-secret-key
-        TF_VAR_cloudflare_api_token=cloudflare-api-token
-        TF_VAR_cloudflare_account_id=cloudflare-account-id
+        TF_VAR_yoco_secret_key=app-braveart-yoco-secret-key
+        TF_VAR_cloudflare_api_token=platform-cloudflare-api-token
+        TF_VAR_cloudflare_account_id=platform-cloudflare-account-id
